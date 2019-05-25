@@ -38,24 +38,10 @@ class ConnectionScraper(Scraper):
             raise ValueError("Url must look like ...linkedin.com/in/NAME")
         self.current_profile = url.split(r'com/in/')[1]
         self.driver.get(url)
-        # Wait for page to load dynamically via javascript
-        try:
-            myElem = WebDriverWait(self.driver, self.timeout).until(AnyEC(
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, '.pv-top-card-section')),
-                EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, '.profile-unavailable'))
-            ))
-        except TimeoutException as e:
-            raise Exception(
-                """Took too long to load profile.  Common problems/solutions:
-                1. Invalid LI_AT value: ensure that yours is correct (they
-                   update frequently)
-                2. Slow Internet: increase the timeout parameter in the Scraper constructor""")
 
         # Check if we got the 'profile unavailable' page
         try:
-            self.driver.find_element_by_css_selector('.pv-top-card-section')
+            self.driver.find_element_by_css_selector('.pv-top-card-v3')
         except:
             raise ValueError(
                 'Profile Unavailable: Profile link does not match any current Linkedin Profiles')
@@ -64,7 +50,7 @@ class ConnectionScraper(Scraper):
         try:
             see_connections_link = WebDriverWait(self.driver, self.timeout).until(EC.presence_of_element_located((
                 By.CSS_SELECTOR,
-                '.pv-top-card-v2-section__link--connections'
+                "a[data-control-name='topcard_view_all_connections']"
             )))
         except TimeoutException as e:
             print("""Took too long to load connections link. This usually indicates you were trying to
@@ -72,36 +58,30 @@ scrape the connections of someone you aren't connected to.""")
             return []
 
         see_connections_link.click()
-        try:
-            self.configure_connection_type()
-        except TimeoutException:
-            return []
-        all_conns = []
-
-    def next_page(self):
-        next_btn = self.driver.find_element_by_css_selector('button.next')
-        next_btn.click()
-        self.wait(EC.text_to_be_present_in_element(
-            (By.CSS_SELECTOR, '.results-paginator li.page-list li.active'), str(self.page_num + 1)
-        ))
-        self.page_num += 1
+        # From connection page, scrape all pages
+        all_connections = self.scrape_all_pages()
+        return all_connections
 
     def scrape_all_pages(self):
         self.page_num = 1
         all_results = []
-        more_pages = True
-        while more_pages:
-            more_pages, page_results = self.scrape_page()
+        while True:
+            next_btn, page_results = self.scrape_page()
             all_results += page_results
-            if more_pages:
-                self.next_page()
+            if next_btn:
+                next_btn.click()
+                self.page_num += 1
+            else:
+                break
         return all_results
 
     def scrape_page(self):
         print("SCRAPING PAGE: ", self.page_num)
         self.scroll_to_bottom()
         try:
-            next_btn = self.driver.find_element_by_css_selector('button.next')
+            next_btn = self.driver.find_element_by_css_selector('.artdeco-pagination__button--next')
+            if 'artdeco-button--disabled' in next_btn.get_attribute('outerHTML'):
+                next_btn = None
         except NoSuchElementException:
             next_btn = None
         connections = self.driver.find_elements_by_css_selector(
@@ -116,7 +96,7 @@ scrape the connections of someone you aren't connected to.""")
             user_id = re.search(r'/in/(.*?)/', link).group(1)
             result['id'] = user_id
             results.append(result)
-        return bool(next_btn), results
+        return next_btn, results
 
     def configure_connection_type(self):
         dropdown_btn = self.wait_for_el(

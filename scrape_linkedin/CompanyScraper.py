@@ -23,7 +23,6 @@ class CompanyScraper(Scraper):
             life_html = self.get_life()
         if jobs:
             jobs_html = self.get_jobs()
-        print("JOBS", jobs_html, "\n\n\n\n\nLIFE", life_html)
         return Company(overview_html, jobs_html, life_html)
 
     def load_initial(self, company):
