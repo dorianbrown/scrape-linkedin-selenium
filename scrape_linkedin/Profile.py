@@ -16,37 +16,19 @@ class Profile(ResultsObject):
         contact_info = one_or_default(self.soup, '.pv-contact-info')
 
         personal_info = get_info(top_card, {
-            'name': '.pv-top-card-section__name',
-            'headline': '.pv-top-card-section__headline',
+            'name': '.pv-profile-sticky-header__name',
+            'headline': '.pv-profile-sticky-header__headline',
             'company': '.pv-top-card-v2-section__company-name',
             'school': '.pv-top-card-v2-section__school-name',
             'location': '.pv-top-card-section__location',
             'summary': 'p.pv-top-card-section__summary-text'
         })
 
-        image_div = one_or_default(top_card, '.profile-photo-edit__preview')
-        image_url = ''
-        # print(image_div)
-        if image_div:
-            image_url = image_div['src']
-        else:
-            image_div = one_or_default(top_card, '.pv-top-card-section__photo')
-            style_string = image_div['style']
-            pattern = re.compile('background-image: url\("(.*?)"')
-            matches = pattern.match(style_string)
-            if matches and matches.groups():
-                image_url = matches.groups()[0]
-            else:
-                print("Unable to scrape profile image...continuing")
-
-        personal_info['image'] = image_url
-
         followers_text = text_or_default(self.soup,
                                          '.pv-recent-activity-section__follower-count', '')
         personal_info['followers'] = followers_text.replace(
             'followers', '').strip()
 
-        # print(contact_info)
         personal_info.update(get_info(contact_info, {
             'email': '.ci-email .pv-contact-info__ci-container',
             'phone': '.ci-phone .pv-contact-info__ci-container',

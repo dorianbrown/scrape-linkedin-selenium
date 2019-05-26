@@ -17,11 +17,6 @@ class ProfileScraper(Scraper):
     details about the constructor.
     """
 
-    def scrape_by_email(self, email):
-        self.load_profile_page(
-            'https://www.linkedin.com/sales/gmail/profile/proxy/{}'.format(email))
-        return self.get_profile()
-
     def scrape(self, url='', user=None):
         self.load_profile_page(url, user)
         return self.get_profile()
@@ -44,7 +39,7 @@ class ProfileScraper(Scraper):
         try:
             myElem = WebDriverWait(self.driver, self.timeout).until(AnyEC(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, '.pv-top-card-section')),
+                    (By.CSS_SELECTOR, '.pv-top-card-section__photo-wrapper')),
                 EC.presence_of_element_located(
                     (By.CSS_SELECTOR, '.profile-unavailable'))
             ))
@@ -57,15 +52,6 @@ class ProfileScraper(Scraper):
                    constructor
                 3. Invalid e-mail address (or user does not allow e-mail scrapes) on scrape_by_email call
                 """)
-
-        # Check if we got the 'profile unavailable' page
-        try:
-            self.driver.find_element_by_css_selector('.pv-top-card-section')
-        except:
-            raise ValueError(
-                'Profile Unavailable: Profile link does not match any current Linkedin Profiles')
-        # Scroll to the bottom of the page incrementally to load any lazy-loaded content
-        self.scroll_to_bottom()
 
     def get_profile(self):
         try:
@@ -82,7 +68,7 @@ class ProfileScraper(Scraper):
             # Scroll to top to put clickable button in view
             self.driver.execute_script("window.scrollTo(0, 0);")
             button = self.driver.find_element_by_css_selector(
-                '.pv-top-card-v2-section__contact-info')
+                "a[data-control-name='contact_see_more'")
             button.click()
             contact_info = self.wait_for_el('.pv-contact-info')
             return contact_info.get_attribute('outerHTML')
