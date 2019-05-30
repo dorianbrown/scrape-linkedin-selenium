@@ -77,6 +77,14 @@ scrape the connections of someone you aren't connected to.""")
 
     def scrape_page(self):
         print("SCRAPING PAGE: ", self.page_num)
+        try:
+            WebDriverWait(self.driver, self.timeout).until(EC.presence_of_element_located((
+                By.CSS_SELECTOR,
+                ".search-result__image-wrapper"
+            )))
+        except TimeoutException as e:
+            print("""Took too long to load connections link. This usually indicates you were trying to
+scrape the connections of someone you aren't connected to.""")
         self.scroll_to_bottom()
         try:
             next_btn = self.driver.find_element_by_css_selector('.artdeco-pagination__button--next')

@@ -1,5 +1,6 @@
 from .Scraper import Scraper
-import json
+import json, re
+from requests.utils import quote
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -11,9 +12,9 @@ from .utils import AnyEC
 
 
 class CompanyScraper(Scraper):
-    def scrape(self, company, overview=True, jobs=False, life=False, insights=False):
+    def scrape(self, company_id=None, company_name=None, overview=True, jobs=False, life=False, insights=False):
         # Get Overview
-        self.load_initial(company)
+        self.load_initial(company_id, company_name)
 
         jobs_html = life_html = insights_html = overview_html = ''
 
@@ -25,8 +26,10 @@ class CompanyScraper(Scraper):
             jobs_html = self.get_jobs()
         return Company(overview_html, jobs_html, life_html)
 
-    def load_initial(self, company):
-        url = 'https://www.linkedin.com/company/{}'.format(company)
+    def load_initial(self, company_id, company_name):
+        if company_name:
+            company_id = self.get_company_id(company_name)
+        url = 'https://www.linkedin.com/company/{}'.format(company_id)
 
         self.driver.get(url)
         try:
@@ -47,6 +50,42 @@ class CompanyScraper(Scraper):
         except:
             raise ValueError(
                 'Company Unavailable: Company link does not match any companies on LinkedIn')
+
+    def get_company_id(self, name):
+
+        url = f"https://www.linkedin.com/search/results/companies/?keywords={quote(name)}"
+        print(url)
+        self.driver.get(url)
+
+        try:
+            myElem = WebDriverWait(self.driver, self.timeout).until(AnyEC(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, '.search-result__info')),
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, '.error-container'))
+            ))
+        except TimeoutException as e:
+            raise ValueError(
+                """Took too long to load company.  Common problems/solutions:
+                1. Invalid LI_AT value: ensure that yours is correct (they
+                   update frequently)
+                2. Slow Internet: increase the timeout parameter in the Scraper constructor""")
+
+        first_el = self.driver.find_element_by_css_selector(".company.search-result--occlusion-enabled")
+
+        regex = r"href=\"\/company\/([\w-]+)"
+        company_id = re.findall(regex, first_el.get_attribute("outerHTML"))
+        if company_id:
+            self.driver.get(f"https://www.linkedin.com/company/{company_id[0]}")
+            WebDriverWait(self.driver, self.timeout).until(AnyEC(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, '.org-top-card')),
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, '.error-container'))
+            ))
+            return re.findall(r"([^\/]+)\/$", self.driver.current_url)[0]
+        else:
+            raise ValueError(f"Couldn't find company_id of '{name}'")
 
     def get_overview(self):
         try:
